@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 public class HttpClientFactory {
-    private static final int TIMEOUT = 30;
+    private static final int TIMEOUT = 60;
 
     public CloseableHttpClient getCloseableHttpClient(String host, Integer port) {
         HttpHost proxy = null;
@@ -31,7 +31,7 @@ public class HttpClientFactory {
         PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
         connectionManager.setMaxTotal(100);
         connectionManager.setDefaultMaxPerRoute(20);
-        connectionManager.closeIdleConnections(30, TimeUnit.SECONDS);
+        connectionManager.closeIdleConnections(60, TimeUnit.SECONDS);
 
         return HttpClients.custom()
                 .setConnectionManager(connectionManager)
