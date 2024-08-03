@@ -2,6 +2,7 @@ package com.github.courtandrey.sudrfscraper.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.courtandrey.sudrfscraper.configuration.ApplicationConfiguration;
+import com.github.courtandrey.sudrfscraper.configuration.courtconfiguration.Level;
 import com.github.courtandrey.sudrfscraper.configuration.searchrequest.Field;
 import com.github.courtandrey.sudrfscraper.configuration.searchrequest.Instance;
 import com.github.courtandrey.sudrfscraper.configuration.searchrequest.SearchRequest;
@@ -16,10 +17,7 @@ import com.github.courtandrey.sudrfscraper.web.dto.ServerConnectionDetails;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -89,7 +87,8 @@ public class AjaxRestController {
     }
 
     @PostMapping("/check_request")
-    public ResponseEntity<String> checkRequest(@RequestBody RequestDetails requestDetails) {
+    public ResponseEntity<String> checkRequest(@RequestBody RequestDetails requestDetails,
+    @RequestHeader(name = "Selected-Language") String language) {
         try {
             ResponseEntity<String> valid = validate(requestDetails);
             if (valid != null) return valid;
@@ -127,6 +126,12 @@ public class AjaxRestController {
             if (!requestDetails.getStartDate().isEmpty()) {
                 SearchRequest.getInstance().setResultDateFrom(validator.validateDate(requestDetails.getStartDate()));
             }
+            if (!requestDetails.getEntryEndDate().isEmpty()) {
+                SearchRequest.getInstance().setEntryDateTill(validator.validateDate(requestDetails.getEntryEndDate()));
+            }
+            if (!requestDetails.getEntryStartDate().isEmpty()) {
+                SearchRequest.getInstance().setEntryDateFrom(validator.validateDate(requestDetails.getEntryStartDate()));
+            }
             if (!requestDetails.getText().trim().isEmpty()) {
                 SearchRequest.getInstance().setText(requestDetails.getText());
             }
@@ -134,6 +139,7 @@ public class AjaxRestController {
             ApplicationConfiguration.getInstance().setProperty("basic.continue",String.valueOf(requestDetails.getMeta().isNeedToContinue()));
             ApplicationConfiguration.getInstance().setProperty("basic.name",requestDetails.getMeta().getName());
             ApplicationConfiguration.getInstance().setProperty("basic.dump",requestDetails.getChosenDump());
+            ApplicationConfiguration.getInstance().setProperty("basic.language", language);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Internal Error. Please change you request." +
                     " If it continues, write to sudarkinandrew@gmail.com");

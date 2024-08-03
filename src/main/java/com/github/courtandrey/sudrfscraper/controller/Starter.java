@@ -7,6 +7,7 @@ import com.github.courtandrey.sudrfscraper.configuration.courtconfiguration.Issu
 import com.github.courtandrey.sudrfscraper.configuration.courtconfiguration.Level;
 import com.github.courtandrey.sudrfscraper.configuration.courtconfiguration.StrategyName;
 import com.github.courtandrey.sudrfscraper.configuration.dumpconfiguration.ServerConnectionInfo;
+import com.github.courtandrey.sudrfscraper.configuration.searchrequest.Instance;
 import com.github.courtandrey.sudrfscraper.configuration.searchrequest.SearchRequest;
 import com.github.courtandrey.sudrfscraper.dump.DBUpdaterService;
 import com.github.courtandrey.sudrfscraper.dump.JSONUpdaterService;
@@ -142,35 +143,35 @@ public class Starter {
     }
 
     private StrategyName[] extractStrategies() {
-        String regionString = ApplicationConfiguration.getInstance().getProperty("dev.strategies");
-        if (regionString == null || regionString.isEmpty()) return null;
-        String[] regionsString = regionString.split(",");
-        StrategyName[] regions = new StrategyName[regionsString.length];
+        String strategyString = ApplicationConfiguration.getInstance().getProperty("dev.strategies");
+        if (strategyString == null || strategyString.isEmpty()) return null;
+        String[] strategiesString = strategyString.split(",");
+        StrategyName[] strategies = new StrategyName[strategiesString.length];
         try {
-            for (int i = 0; i < regionsString.length; i++) {
-                regions[i] = StrategyName.parseStrategy(regionsString[i]);
+            for (int i = 0; i < strategiesString.length; i++) {
+                strategies[i] = StrategyName.parseStrategy(strategiesString[i]);
             }
         } catch (Exception e) {
             SimpleLogger.log(LoggingLevel.WARNING, Message.WRONG_STRATEGY_FORMAT);
             return null;
         }
-        return regions;
+        return strategies;
     }
 
     private Level[] extractSelectedLevels() {
-        String regionString = ApplicationConfiguration.getInstance().getProperty("basic.levels");
-        if (regionString.isEmpty()) return  null;
-        String[] regionsString = regionString.split(",");
-        Level[] regions = new Level[regionsString.length];
+        String levelString = ApplicationConfiguration.getInstance().getProperty("basic.levels");
+        if (levelString.isEmpty()) return  null;
+        String[] levelsString = levelString.split(",");
+        Level[] levels = new Level[levelsString.length];
         try {
-            for (int i = 0; i < regionsString.length; i++) {
-                regions[i] = Level.parseLevel(regionsString[i]);
+            for (int i = 0; i < levelsString.length; i++) {
+                levels[i] = Level.parseLevel(levelsString[i]);
             }
         } catch (LevelParsingException e) {
             SimpleLogger.log(LoggingLevel.WARNING, Message.WRONG_LEVEL_FORMAT);
             return null;
         }
-        return regions;
+        return levels;
     }
 
     public void setServerConnectionInfoAndTest(String DB_URL, String user, String password) throws SQLException {
@@ -230,7 +231,7 @@ public class Starter {
 
     public void executeScrapping(boolean needToContinue) throws SearchRequestUnsetException {
         Runtime.getRuntime().addShutdownHook(new Thread(this::end));
-        view.showFrameWithInfo(ViewFrame.INFO, Message.BEGINNING_OF_EXECUTION);
+        view.showFrameWithInfo(ViewFrame.INFO, getMessage(Message.BEGINNING_OF_EXECUTION, Message.BEGINNING_OF_EXECUTION_RU));
         mainThread = Thread.currentThread();
         try {
             checkSearchConfiguration();
@@ -249,6 +250,11 @@ public class Starter {
         } finally {
             end();
         }
+    }
+
+    private static Message getMessage(Message english, Message russian) {
+        return ApplicationConfiguration.getInstance().getProperty("basic.language").equals("ru")
+                ? russian : english;
     }
 
     private void checkSearchConfiguration() throws SearchRequestUnsetException {
@@ -282,7 +288,7 @@ public class Starter {
 
         ConfigurationLoader.storeConfiguration(configHolder.getCCs());
 
-        view.showFrameWithInfo(ViewFrame.INFO, Message.SCRAPING_DONE,
+        view.showFrameWithInfo(ViewFrame.INFO, getMessage(Message.SCRAPING_DONE, Message.SCRAPING_DONE_RU),
                 ApplicationConfiguration.getInstance().getProperty("basic.result.path") +
                 ApplicationConfiguration.getInstance().getProperty("basic.name") + "/");
 
@@ -296,7 +302,7 @@ public class Starter {
 
     private void continueScrapping() throws InterruptedException {
         SimpleLogger.log(LoggingLevel.INFO, Message.SECOND_LAP);
-        view.showFrameWithInfo(ViewFrame.INFO, Message.SECOND_LAP);
+        view.showFrameWithInfo(ViewFrame.INFO, getMessage(Message.SECOND_LAP, Message.SECOND_LAP_RU));
         ConfigurationHelper.analyzeIssues(configHolder.getCCs());
         execute(true);
     }
@@ -304,7 +310,7 @@ public class Starter {
     private void scrap() throws InterruptedException {
         execute(false);
         continueScrapping();
-        view.showFrameWithInfo(ViewFrame.INFO, Message.DUMP);
+        view.showFrameWithInfo(ViewFrame.INFO, getMessage(Message.DUMP, Message.DUMP_RU));
     }
 
     private void execute(Boolean ignoreInactive) throws InterruptedException {
@@ -332,18 +338,47 @@ public class Starter {
         }
 
         if (selectedRegions != null) {
-            mainCCS = mainCCS.stream().filter(x -> Arrays.stream(selectedRegions).anyMatch(r -> r == x.getRegion())).collect(Collectors.toList());
-            singleCCS = singleCCS.stream().filter(x -> Arrays.stream(selectedRegions).anyMatch(r -> r == x.getRegion())).collect(Collectors.toList());
+            mainCCS = mainCCS.stream()
+                    .filter(x -> Arrays.stream(selectedRegions).anyMatch(r -> r == x.getRegion()) || x.getRegion() == 0)
+                    .collect(Collectors.toList());
+            singleCCS = singleCCS.stream()
+                    .filter(x -> Arrays.stream(selectedRegions).anyMatch(r -> r == x.getRegion()) || x.getRegion() == 0)
+                    .collect(Collectors.toList());
         }
 
         if (levels != null) {
-            mainCCS = mainCCS.stream().filter(x->Arrays.stream(levels).anyMatch(r->r==x.getLevel())).collect(Collectors.toList());
-            singleCCS = singleCCS.stream().filter(x->Arrays.stream(levels).anyMatch(r->r==x.getLevel())).collect(Collectors.toList());
+            mainCCS = mainCCS.stream()
+                    .filter(x -> Arrays.stream(levels).anyMatch(l -> l == x.getLevel()) || x.getLevel().equals(Level.CASSATION))
+                    .collect(Collectors.toList());
+            singleCCS = singleCCS.stream()
+                    .filter(x -> Arrays.stream(levels).anyMatch(l -> l == x.getLevel()) || x.getLevel().equals(Level.CASSATION))
+                    .collect(Collectors.toList());
+        }
+
+        boolean isCassationSelected = Arrays.asList(searchConfiguration.getInstanceList()).contains(Instance.CASSATION);
+
+        if (isCassationSelected && searchConfiguration.getInstanceList().length == 1) {
+            mainCCS = mainCCS.stream()
+                    .filter(x -> x.getLevel().equals(Level.CASSATION))
+                    .toList();
+
+            singleCCS = singleCCS.stream()
+                    .filter(x -> x.getLevel().equals(Level.CASSATION))
+                    .toList();
+        }
+
+        if (!isCassationSelected) {
+            mainCCS = removeCassationLevel(mainCCS);
+            singleCCS = removeCassationLevel(singleCCS);
         }
 
         if (strategyNames != null) {
-            mainCCS = mainCCS.stream().filter(x->Arrays.stream(strategyNames).anyMatch(r->r==x.getStrategyName())).collect(Collectors.toList());
-            singleCCS = singleCCS.stream().filter(x->Arrays.stream(strategyNames).anyMatch(r->r==x.getStrategyName())).collect(Collectors.toList());
+            mainCCS = mainCCS.stream()
+                    .filter(x -> Arrays.stream(strategyNames).anyMatch(s -> s == x.getStrategyName()))
+                    .collect(Collectors.toList());
+            singleCCS = singleCCS.stream()
+                    .filter(x -> Arrays.stream(strategyNames).anyMatch(s -> s == x.getStrategyName()))
+                    .collect(Collectors.toList());
         }
 
         mainCCS = checkIfNothingToExecute(mainCCS);
@@ -371,6 +406,13 @@ public class Starter {
 
         mainExecutor.shutdown();
         seleniumExecutor.shutdown();
+    }
+
+    private List<CourtConfiguration> removeCassationLevel(List<CourtConfiguration> ccs) {
+        ccs = ccs.stream()
+                .filter(x -> !x.getLevel().equals(Level.CASSATION))
+                .collect(Collectors.toList());
+        return ccs;
     }
 
     private synchronized void update(Collection<Case> cases) {

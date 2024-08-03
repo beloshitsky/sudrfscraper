@@ -1,6 +1,7 @@
 package com.github.courtandrey.sudrfscraper.strategy;
 
 import com.github.courtandrey.sudrfscraper.configuration.courtconfiguration.SearchPattern;
+import com.github.courtandrey.sudrfscraper.configuration.searchrequest.Instance;
 import com.github.courtandrey.sudrfscraper.dump.model.*;
 import com.github.courtandrey.sudrfscraper.service.logger.LoggingLevel;
 import com.github.courtandrey.sudrfscraper.service.logger.SimpleLogger;
@@ -91,7 +92,7 @@ public class GeneralMetaParser implements MetaParser {
         }
 
 
-        Element contentPerson = document.getElementById("tab_id_PersonList");
+        Element contentPerson = document.getElementById("tab_content_PersonList");
         if (contentPerson == null) {
             SimpleLogger.log(LoggingLevel.DEBUG, "Couldn't parse sides for: " + aCase.getLinks().get(LinkType.META));
         } else {
@@ -132,6 +133,7 @@ public class GeneralMetaParser implements MetaParser {
             case "КПП" -> side.setKPP(src);
             case "ОГРН" -> side.setOGRN(src);
             case "ОГРНИП" -> side.setOGRNIP(src);
+            case "Перечень статей" -> side.setArticles(src);
             default -> SimpleLogger.log(LoggingLevel.WARNING, "Couldn't match property for Side: " + trg);
         }
     }
@@ -143,7 +145,7 @@ public class GeneralMetaParser implements MetaParser {
             case "Дата", "Дата события" -> step.setEventDate(src);
             case "Время", "Время слушания", "Время события" -> step.setEventTime(src);
             case "Место проведения" -> step.setEventPlace(src);
-            case "Результат события" -> step.setEventResult(src);
+            case "Результат события", "Результат" -> step.setEventResult(src);
             case "Основание для выбранного результата события", "Основания для выбранного результата события" -> step.setEventResultReason(src);
             case "Примечание" -> step.setAdditionalInfo(src);
             default -> {
@@ -191,6 +193,10 @@ public class GeneralMetaParser implements MetaParser {
         } else {
             boolean isHeadFound = false;
             for (Element el:tbodies) {
+                if (el.getElementsByTag("th").text().contains("РАССМОТРЕНИЕ В НИЖЕСТОЯЩЕМ СУДЕ")
+                        && aCase.getInstance().equals(Instance.CASSATION.name().toUpperCase())) {
+                    setRegionForCassation(el, aCase);
+                }
                 if (isHeadFound) break;
                 Elements trs = el.getElementsByTag("tr");
                 List<String> heads = new ArrayList<>();
@@ -268,5 +274,25 @@ public class GeneralMetaParser implements MetaParser {
         if (aCase.getCUI() == null) SimpleLogger.log(LoggingLevel.DEBUG, "Couldn't find a CUI for: " + aCase.getLinks().get(LinkType.META));
 
         return new CaseParsingResultBox(CaseParsingResult.SUCCESS, aCase);
+    }
+
+    private void setRegionForCassation(Element element, Case aCase) {
+        for (Element row : element.select("tr")) {
+            Elements cells = row.select("td");
+            if (cells.size() == 2 && isCellsContainRegionText(cells)) {
+                String s = cells.get(1).text();
+
+                String[] parts = s.split(" ");
+
+                aCase.setRegion(Integer.parseInt(parts[0]));
+
+                break;
+            }
+        }
+    }
+
+    private static boolean isCellsContainRegionText(Elements cells) {
+        return cells.get(0).text().contains("Регион нижестоящего суда")
+                || cells.get(0).text().contains("Регион суда первой инстанции");
     }
 }
